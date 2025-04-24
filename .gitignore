@@ -1,0 +1,14 @@
+# Entorno virtual
+venv/
+__pycache__/
+*.sqlite3
+*.log
+
+# Archivos de Python
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs y editores
+.vscode/
+.idea/
