@@ -16,6 +16,7 @@ class Survey(db.Model):
     finca = db.relationship('Farm', back_populates='encuestas')
     tipo_encuesta = db.relationship('SurveyType', back_populates='encuestas')
     respuestas = db.relationship('ResponseFactor', back_populates='encuesta', lazy=True)
+    respuestas_abiertas = db.relationship('OpenResponse', back_populates='encuesta')
 
     def to_dict(self):
         return {

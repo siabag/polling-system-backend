@@ -16,6 +16,7 @@ class Factor(db.Model):
     tipo_encuesta = db.relationship('SurveyType', back_populates='factores')
     valores_posibles = db.relationship('PossibleValue', back_populates='factor', lazy=True)
     respuestas = db.relationship('ResponseFactor', back_populates='factor', lazy=True)
+    respuestas_abiertas = db.relationship('OpenResponse', back_populates='factor')
 
     def to_dict(self):
         return {

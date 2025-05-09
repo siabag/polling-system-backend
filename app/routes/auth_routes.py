@@ -63,7 +63,18 @@ def login():
 
     # Generar un token JWT
     access_token = create_access_token(identity=user.id)
-    return jsonify(access_token=access_token), 200
+    
+    # Devolver el token y la información del usuario
+    return jsonify({
+        "access_token": access_token,
+        "user": {
+            "id": user.id,
+            "nombre": user.nombre,
+            "apellido": user.apellido,
+            "correo": user.correo,
+            "rol": user.rol.nombre
+        }
+    }), 200
 
 # Endpoint para cerrar sesión
 @auth_bp.route('/logout', methods=['POST'])
