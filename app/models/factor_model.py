@@ -13,10 +13,9 @@ class Factor(db.Model):
     updated_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
     # Relaciones
-    tipo_encuesta = db.relationship('SurveyType', back_populates='factores')
+    tipo_encuesta = db.relationship('SurveyType', back_populates='factores', lazy=True)
     valores_posibles = db.relationship('PossibleValue', back_populates='factor', lazy=True)
     respuestas = db.relationship('ResponseFactor', back_populates='factor', lazy=True)
-    respuestas_abiertas = db.relationship('OpenResponse', back_populates='factor')
 
     def to_dict(self):
         return {
@@ -25,5 +24,7 @@ class Factor(db.Model):
             "descripcion": self.descripcion,
             "categoria": self.categoria,
             "activo": self.activo,
-            "tipo_encuesta_id": self.tipo_encuesta_id
+            "tipo_encuesta_id": self.tipo_encuesta_id,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
         }

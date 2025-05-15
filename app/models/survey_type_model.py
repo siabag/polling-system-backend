@@ -13,11 +13,13 @@ class SurveyType(db.Model):
     # Relaciones
     factores = db.relationship('Factor', back_populates='tipo_encuesta', lazy=True)
     encuestas = db.relationship('Survey', back_populates='tipo_encuesta', lazy=True)
-    
+
     def to_dict(self):
         return {
             "id": self.id,
             "nombre": self.nombre,
             "descripcion": self.descripcion,
-            "activo": self.activo
+            "activo": self.activo,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
         }

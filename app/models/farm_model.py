@@ -14,7 +14,7 @@ class Farm(db.Model):
     updated_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
     # Relaciones
-    usuario = db.relationship('User', back_populates='fincas')
+    usuario = db.relationship('User', back_populates='fincas', lazy=True)
     encuestas = db.relationship('Survey', back_populates='finca', lazy=True)
 
     def to_dict(self):
@@ -25,5 +25,7 @@ class Farm(db.Model):
             "latitud": str(self.latitud),
             "longitud": str(self.longitud),
             "propietario": self.propietario,
-            "usuario_id": self.usuario_id
+            "usuario_id": self.usuario_id,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
         }

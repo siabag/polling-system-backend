@@ -13,7 +13,7 @@ class PossibleValue(db.Model):
     updated_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
     # Relaciones
-    factor = db.relationship('Factor', back_populates='valores_posibles')
+    factor = db.relationship('Factor', back_populates='valores_posibles', lazy=True)
     respuestas = db.relationship('ResponseFactor', back_populates='valor_posible', lazy=True)
 
     def to_dict(self):
@@ -23,5 +23,7 @@ class PossibleValue(db.Model):
             "valor": self.valor,
             "codigo": self.codigo,
             "descripcion": self.descripcion,
-            "activo": self.activo
+            "activo": self.activo,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
         }

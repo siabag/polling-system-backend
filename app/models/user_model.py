@@ -8,12 +8,13 @@ class User(db.Model):
     apellido = db.Column(db.String(100), nullable=False)
     correo = db.Column(db.String(100), nullable=False, unique=True)
     contrasena_hash = db.Column(db.String(255), nullable=False)
-    fecha_creacion = db.Column(db.TIMESTAMP, default=db.func.current_timestamp())
     activo = db.Column(db.Boolean, default=True)
     rol_id = db.Column(db.Integer, db.ForeignKey('rol.id'), nullable=False)
+    created_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp())
+    updated_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
     # Relaciones
-    rol = db.relationship('Role', back_populates='usuarios')
+    rol = db.relationship('Role', back_populates='usuarios', lazy=True)
     fincas = db.relationship('Farm', back_populates='usuario', lazy=True)
     encuestas = db.relationship('Survey', back_populates='usuario', lazy=True)
 
@@ -24,5 +25,7 @@ class User(db.Model):
             "apellido": self.apellido,
             "correo": self.correo,
             "activo": self.activo,
-            "rol": self.rol.nombre if self.rol else None
+            "rol_id": self.rol_id,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
         }
