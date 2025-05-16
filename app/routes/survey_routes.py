@@ -3,37 +3,53 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy.exc import SQLAlchemyError
-from app.models.survey_model import Survey
-from app.models.user_model import User
-from app.models.farm_model import Farm
+from datetime import datetime
 from app.extensions import db
+from app.models.survey_model import Encuesta
+from app.models.user_model import Usuario
+from app.models.farm_model import Finca
+from app.models.factor_model import Factor
+from app.models.possible_value_model import ValorPosible
+from app.models.response_factor_model import RespuestaFactor
+from app.models.survey_type_model import TipoEncuesta
 
 # Crear Blueprint para las rutas de encuestas
 survey_bp = Blueprint('survey', __name__)
 
-def get_survey_with_details(survey_id):
+def get_encuesta_with_details(encuesta_id):
 
-    survey = Survey.query.get(survey_id)
-    if not survey:
+    encuesta = Encuesta.query.get(encuesta_id)
+    if not encuesta:
         return None
 
     # Obtener datos relacionados
-    farm = Farm.query.get(survey.finca_id)
+    tipo_encuesta = encuesta.tipo_encuesta
+    finca = Finca.query.get(encuesta.finca_id)
 
     return {
-        "id": survey.id,
-        "fecha_aplicacion": survey.fecha_aplicacion.isoformat(),
-        "observaciones": survey.observaciones,
-        "completada": survey.completada,
-        "usuario_id": survey.usuario_id,
-        "finca_id": survey.finca_id,
+        "id": encuesta.id,
+        "fecha_aplicacion": encuesta.fecha_aplicacion.isoformat(),
+        "tipo_encuesta": {
+            "id": tipo_encuesta.id,
+            "nombre": tipo_encuesta.nombre
+        } if tipo_encuesta else None,
         "finca": {
-            "id": farm.id,
-            "nombre": farm.nombre,
-            "ubicacion": farm.ubicacion
-        } if farm else None,
-        "created_at": survey.created_at.isoformat(),
-        "updated_at": survey.updated_at.isoformat() if survey.updated_at else None
+            "id": finca.id,
+            "nombre": finca.nombre
+        } if finca else None,
+        "observaciones": encuesta.observaciones,
+        "completada": encuesta.completada,
+        "respuestas": [
+            {
+                "id": respuesta.id,
+                "factor_id": respuesta.factor_id,
+                "valor_posible_id": respuesta.valor_posible_id,
+                "respuesta_texto": respuesta.respuesta_texto
+            }
+            for respuesta in encuesta.respuestas
+        ],
+        "created_at": encuesta.created_at.isoformat(),
+        "updated_at": encuesta.updated_at.isoformat() if encuesta.updated_at else None
     }
 
 # Endpoint para crear una nueva encuesta
@@ -44,51 +60,106 @@ def create_encuesta():
         user_id = get_jwt_identity()
         data = request.get_json()
 
-        # Validar datos requeridos
-        required_fields = ['fecha_aplicacion', 'finca_id']
+        # Validar datos mínimos
+        required_fields = ['fecha_aplicacion', 'tipo_encuesta_id', 'finca_id']
         if not all(field in data for field in required_fields):
             return jsonify({
                 "error": True,
-                "message": "Faltan campos requeridos"
+                "message": "Faltan datos requeridos"
             }), 400
 
-        # Verificar que el usuario existe
-        user = User.query.get(user_id)
-        if not user:
+        # Convertir IDs a enteros
+        tipo_encuesta_id = int(data['tipo_encuesta_id'])
+        finca_id = int(data['finca_id'])
+
+        # Verificar existencia de entidades relacionadas
+        tipo_encuesta = TipoEncuesta.query.filter_by(id=tipo_encuesta_id, activo=True).first()
+        if not tipo_encuesta:
             return jsonify({
                 "error": True,
-                "message": "Usuario no encontrado"
-            }), 404
+                "message": "Tipo de encuesta no válido"
+            }), 400
 
-        # Verificar que la finca existe
-        farm = Farm.query.get(data['finca_id'])
-        if not farm:
+        finca = Finca.query.get(finca_id)
+        if not finca:
             return jsonify({
                 "error": True,
                 "message": "Finca no encontrada"
             }), 404
 
-        # Crear nueva encuesta dentro de una transacción
+        # Iniciar transacción
         with db.session.begin_nested():
-            new_survey = Survey(
+            # Crear encuesta
+            nueva_encuesta = Encuesta(
                 fecha_aplicacion=data['fecha_aplicacion'],
-                observaciones=data.get('observaciones', ''),
-                completada=data.get('completada', False),
+                tipo_encuesta_id=tipo_encuesta_id,
                 usuario_id=user_id,
-                finca_id=data['finca_id']
+                finca_id=finca_id,
+                observaciones=data.get('observaciones', ''),
+                completada=False
             )
-            db.session.add(new_survey)
+            db.session.add(nueva_encuesta)
+            db.session.flush()  # Para obtener el ID generado
+
+            # Procesar respuestas si están presentes
+            if 'respuestas' in data and data['respuestas']:
+                factor_ids = [resp['factor_id'] for resp in data['respuestas']]
+                factores = Factor.query.filter(Factor.id.in_(factor_ids), Factor.activo == True).all()
+                factores_map = {f.id: f for f in factores}
+
+                valores = ValorPosible.query.filter(
+                    ValorPosible.factor_id.in_(factor_ids),
+                    ValorPosible.activo == True
+                ).all()
+                valores_map = {}
+                for v in valores:
+                    if v.factor_id not in valores_map:
+                        valores_map[v.factor_id] = {}
+                    valores_map[v.factor_id][v.id] = v
+
+                for resp in data['respuestas']:
+                    factor_id = int(resp['factor_id'])
+                    valor_id = int(resp['valor_posible_id'])
+
+                    # Validar factor
+                    if factor_id not in factores_map:
+                        return jsonify({
+                            "error": True,
+                            "message": f"Factor {factor_id} no válido para este tipo"
+                        }), 400
+
+                    # Validar valor
+                    if factor_id not in valores_map or valor_id not in valores_map[factor_id]:
+                        return jsonify({
+                            "error": True,
+                            "message": f"Valor {valor_id} no válido para factor {factor_id}"
+                        }), 400
+
+                    # Crear respuesta
+                    nueva_respuesta = RespuestaFactor(
+                        encuesta_id=nueva_encuesta.id,
+                        factor_id=factor_id,
+                        valor_posible_id=valor_id,
+                        respuesta_texto=resp.get('respuesta_texto', '')
+                    )
+                    db.session.add(nueva_respuesta)
 
         # Confirmar la transacción principal
         db.session.commit()
 
-        # Retornar detalles de la encuesta creada
-        survey_data = get_survey_with_details(new_survey.id)
+        # Retornar datos de la encuesta creada
+        encuesta_data = get_encuesta_with_details(nueva_encuesta.id)
         return jsonify({
             "success": True,
-            "data": survey_data,
+            "data": encuesta_data,
             "message": "Encuesta creada exitosamente"
         }), 201
+
+    except ValueError as e:
+        return jsonify({
+            "error": True,
+            "message": f"Datos inválidos: {str(e)}"
+        }), 400
 
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -98,20 +169,26 @@ def create_encuesta():
         }), 500
 
 
-# Endpoint para obtener todas las encuestas de un usuario
+# Endpoint para listar todas las encuestas de un usuario
 @survey_bp.route('/api/encuestas', methods=['GET'])
 @jwt_required()
-def get_user_encuestas():
+def list_encuestas():
     try:
         user_id = get_jwt_identity()
 
-        # Obtener encuestas del usuario
-        surveys = Survey.query.filter_by(usuario_id=user_id).all()
-        result = [get_survey_with_details(survey.id) for survey in surveys]
+        # Obtener parámetros de paginación
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('limit', 10, type=int)
+
+        query = Encuesta.query.filter_by(usuario_id=user_id)
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
         return jsonify({
             "success": True,
-            "data": result,
+            "data": [get_encuesta_with_details(encuesta.id) for encuesta in pagination.items],
+            "total": pagination.total,
+            "page": page,
+            "totalPages": pagination.pages,
             "message": "Encuestas obtenidas exitosamente"
         }), 200
 
@@ -123,25 +200,25 @@ def get_user_encuestas():
 
 
 # Endpoint para obtener los detalles de una encuesta específica
-@survey_bp.route('/api/encuestas/<int:survey_id>', methods=['GET'])
+@survey_bp.route('/api/encuestas/<int:encuesta_id>', methods=['GET'])
 @jwt_required()
-def get_encuesta(survey_id):
+def get_encuesta(encuesta_id):
     try:
         user_id = get_jwt_identity()
 
         # Buscar la encuesta
-        survey = Survey.query.get(survey_id)
-        if not survey or survey.usuario_id != user_id:
+        encuesta = Encuesta.query.get(encuesta_id)
+        if not encuesta or encuesta.usuario_id != user_id:
             return jsonify({
                 "error": True,
                 "message": "Encuesta no encontrada o no autorizada"
             }), 404
 
         # Retornar detalles de la encuesta
-        survey_data = get_survey_with_details(survey.id)
+        encuesta_data = get_encuesta_with_details(encuesta.id)
         return jsonify({
             "success": True,
-            "data": survey_data,
+            "data": encuesta_data,
             "message": "Encuesta obtenida exitosamente"
         }), 200
 
@@ -153,36 +230,94 @@ def get_encuesta(survey_id):
 
 
 # Endpoint para actualizar una encuesta existente
-@survey_bp.route('/api/encuestas/<int:survey_id>', methods=['PUT'])
+@survey_bp.route('/api/encuestas/<int:encuesta_id>', methods=['PUT'])
 @jwt_required()
-def update_encuesta(survey_id):
+def update_encuesta(encuesta_id):
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
 
         # Buscar la encuesta
-        survey = Survey.query.get(survey_id)
-        if not survey or survey.usuario_id != user_id:
+        encuesta = Encuesta.query.get(encuesta_id)
+        if not encuesta or encuesta.usuario_id != user_id:
             return jsonify({
                 "error": True,
                 "message": "Encuesta no encontrada o no autorizada"
             }), 404
 
         # Actualizar campos
-        survey.fecha_aplicacion = data.get('fecha_aplicacion', survey.fecha_aplicacion)
-        survey.observaciones = data.get('observaciones', survey.observaciones)
-        survey.completada = data.get('completada', survey.completada)
+        encuesta.fecha_aplicacion = data.get('fecha_aplicacion', encuesta.fecha_aplicacion)
+        encuesta.observaciones = data.get('observaciones', encuesta.observaciones)
+        encuesta.completada = data.get('completada', encuesta.completada)
 
-        # Guardar cambios en la base de datos
+        # Procesar respuestas si están presentes
+        if 'respuestas' in data and data['respuestas']:
+            factor_ids = [resp['factor_id'] for resp in data['respuestas']]
+            factores = Factor.query.filter(Factor.id.in_(factor_ids), Factor.activo == True).all()
+            factores_map = {f.id: f for f in factores}
+
+            valores = ValorPosible.query.filter(
+                ValorPosible.factor_id.in_(factor_ids),
+                ValorPosible.activo == True
+            ).all()
+            valores_map = {}
+            for v in valores:
+                if v.factor_id not in valores_map:
+                    valores_map[v.factor_id] = {}
+                valores_map[v.factor_id][v.id] = v
+
+            for resp in data['respuestas']:
+                factor_id = int(resp['factor_id'])
+                valor_id = int(resp['valor_posible_id'])
+
+                # Validar factor
+                if factor_id not in factores_map:
+                    return jsonify({
+                        "error": True,
+                        "message": f"Factor {factor_id} no válido para este tipo"
+                    }), 400
+
+                # Validar valor
+                if factor_id not in valores_map or valor_id not in valores_map[factor_id]:
+                    return jsonify({
+                        "error": True,
+                        "message": f"Valor {valor_id} no válido para factor {factor_id}"
+                    }), 400
+
+                # Crear o actualizar respuesta
+                respuesta = RespuestaFactor.query.filter_by(
+                    encuesta_id=encuesta.id,
+                    factor_id=factor_id
+                ).first()
+
+                if respuesta:
+                    respuesta.valor_posible_id = valor_id
+                    respuesta.respuesta_texto = resp.get('respuesta_texto', respuesta.respuesta_texto)
+                else:
+                    nueva_respuesta = RespuestaFactor(
+                        encuesta_id=encuesta.id,
+                        factor_id=factor_id,
+                        valor_posible_id=valor_id,
+                        respuesta_texto=resp.get('respuesta_texto', '')
+                    )
+                    db.session.add(nueva_respuesta)
+
+        # Guardar cambios
         db.session.commit()
 
-        # Retornar detalles actualizados de la encuesta
-        survey_data = get_survey_with_details(survey.id)
+        # Retornar datos de la encuesta actualizada
+        encuesta_data = get_encuesta_with_details(encuesta.id)
         return jsonify({
             "success": True,
-            "data": survey_data,
+            "data": encuesta_data,
             "message": "Encuesta actualizada exitosamente"
         }), 200
+
+    except ValueError as e:
+        return jsonify({
+            "error": True,
+            "message": f"Datos inválidos: {str(e)}"
+        }), 400
 
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -193,15 +328,15 @@ def update_encuesta(survey_id):
 
 
 # Endpoint para eliminar una encuesta
-@survey_bp.route('/api/encuestas/<int:survey_id>', methods=['DELETE'])
+@survey_bp.route('/api/encuestas/<int:encuesta_id>', methods=['DELETE'])
 @jwt_required()
-def delete_encuesta(survey_id):
+def delete_encuesta(encuesta_id):
     try:
         user_id = get_jwt_identity()
 
         # Buscar la encuesta
-        survey = Survey.query.get(survey_id)
-        if not survey or survey.usuario_id != user_id:
+        encuesta = Encuesta.query.get(encuesta_id)
+        if not encuesta or encuesta.usuario_id != user_id:
             return jsonify({
                 "error": True,
                 "message": "Encuesta no encontrada o no autorizada"
@@ -209,7 +344,7 @@ def delete_encuesta(survey_id):
 
         # Eliminar la encuesta dentro de una transacción
         with db.session.begin_nested():
-            db.session.delete(survey)
+            db.session.delete(encuesta)
 
         # Confirmar la transacción principal
         db.session.commit()
