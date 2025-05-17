@@ -5,26 +5,25 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 from app.extensions import db
-from app.models.survey_model import Encuesta
-from app.models.user_model import Usuario
-from app.models.farm_model import Finca
+from app.models.survey_model import Survey
+from app.models.farm_model import Farm
 from app.models.factor_model import Factor
-from app.models.possible_value_model import ValorPosible
-from app.models.response_factor_model import RespuestaFactor
-from app.models.survey_type_model import TipoEncuesta
+from app.models.possible_value_model import PossibleValue
+from app.models.response_factor_model import ResponseFactor
+from app.models.survey_type_model import SurveyType
 
 # Crear Blueprint para las rutas de encuestas
 survey_bp = Blueprint('survey', __name__)
 
 def get_encuesta_with_details(encuesta_id):
 
-    encuesta = Encuesta.query.get(encuesta_id)
+    encuesta = Survey.query.get(encuesta_id)
     if not encuesta:
         return None
 
     # Obtener datos relacionados
     tipo_encuesta = encuesta.tipo_encuesta
-    finca = Finca.query.get(encuesta.finca_id)
+    finca = Farm.query.get(encuesta.finca_id)
 
     return {
         "id": encuesta.id,
@@ -73,14 +72,14 @@ def create_encuesta():
         finca_id = int(data['finca_id'])
 
         # Verificar existencia de entidades relacionadas
-        tipo_encuesta = TipoEncuesta.query.filter_by(id=tipo_encuesta_id, activo=True).first()
+        tipo_encuesta = SurveyType.query.filter_by(id=tipo_encuesta_id, activo=True).first()
         if not tipo_encuesta:
             return jsonify({
                 "error": True,
                 "message": "Tipo de encuesta no válido"
             }), 400
 
-        finca = Finca.query.get(finca_id)
+        finca = Farm.query.get(finca_id)
         if not finca:
             return jsonify({
                 "error": True,
@@ -90,7 +89,7 @@ def create_encuesta():
         # Iniciar transacción
         with db.session.begin_nested():
             # Crear encuesta
-            nueva_encuesta = Encuesta(
+            nueva_encuesta = Survey(
                 fecha_aplicacion=data['fecha_aplicacion'],
                 tipo_encuesta_id=tipo_encuesta_id,
                 usuario_id=user_id,
@@ -107,9 +106,9 @@ def create_encuesta():
                 factores = Factor.query.filter(Factor.id.in_(factor_ids), Factor.activo == True).all()
                 factores_map = {f.id: f for f in factores}
 
-                valores = ValorPosible.query.filter(
-                    ValorPosible.factor_id.in_(factor_ids),
-                    ValorPosible.activo == True
+                valores = PossibleValue.query.filter(
+                    PossibleValue.factor_id.in_(factor_ids),
+                    PossibleValue.activo == True
                 ).all()
                 valores_map = {}
                 for v in valores:
@@ -136,7 +135,7 @@ def create_encuesta():
                         }), 400
 
                     # Crear respuesta
-                    nueva_respuesta = RespuestaFactor(
+                    nueva_respuesta = ResponseFactor(
                         encuesta_id=nueva_encuesta.id,
                         factor_id=factor_id,
                         valor_posible_id=valor_id,
@@ -180,7 +179,7 @@ def list_encuestas():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('limit', 10, type=int)
 
-        query = Encuesta.query.filter_by(usuario_id=user_id)
+        query = Survey.query.filter_by(usuario_id=user_id)
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
         return jsonify({
@@ -207,7 +206,7 @@ def get_encuesta(encuesta_id):
         user_id = get_jwt_identity()
 
         # Buscar la encuesta
-        encuesta = Encuesta.query.get(encuesta_id)
+        encuesta = Survey.query.get(encuesta_id)
         if not encuesta or encuesta.usuario_id != user_id:
             return jsonify({
                 "error": True,
@@ -238,7 +237,7 @@ def update_encuesta(encuesta_id):
         data = request.get_json()
 
         # Buscar la encuesta
-        encuesta = Encuesta.query.get(encuesta_id)
+        encuesta = Survey.query.get(encuesta_id)
         if not encuesta or encuesta.usuario_id != user_id:
             return jsonify({
                 "error": True,
@@ -256,9 +255,9 @@ def update_encuesta(encuesta_id):
             factores = Factor.query.filter(Factor.id.in_(factor_ids), Factor.activo == True).all()
             factores_map = {f.id: f for f in factores}
 
-            valores = ValorPosible.query.filter(
-                ValorPosible.factor_id.in_(factor_ids),
-                ValorPosible.activo == True
+            valores = PossibleValue.query.filter(
+                PossibleValue.factor_id.in_(factor_ids),
+                PossibleValue.activo == True
             ).all()
             valores_map = {}
             for v in valores:
@@ -285,7 +284,7 @@ def update_encuesta(encuesta_id):
                     }), 400
 
                 # Crear o actualizar respuesta
-                respuesta = RespuestaFactor.query.filter_by(
+                respuesta = ResponseFactor.query.filter_by(
                     encuesta_id=encuesta.id,
                     factor_id=factor_id
                 ).first()
@@ -294,7 +293,7 @@ def update_encuesta(encuesta_id):
                     respuesta.valor_posible_id = valor_id
                     respuesta.respuesta_texto = resp.get('respuesta_texto', respuesta.respuesta_texto)
                 else:
-                    nueva_respuesta = RespuestaFactor(
+                    nueva_respuesta = ResponseFactor(
                         encuesta_id=encuesta.id,
                         factor_id=factor_id,
                         valor_posible_id=valor_id,
@@ -335,7 +334,7 @@ def delete_encuesta(encuesta_id):
         user_id = get_jwt_identity()
 
         # Buscar la encuesta
-        encuesta = Encuesta.query.get(encuesta_id)
+        encuesta = Survey.query.get(encuesta_id)
         if not encuesta or encuesta.usuario_id != user_id:
             return jsonify({
                 "error": True,
