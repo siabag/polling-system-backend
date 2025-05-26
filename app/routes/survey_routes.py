@@ -174,6 +174,7 @@ def create_encuesta():
 def list_encuestas():
     try:
         user_id = get_jwt_identity()
+        print(f"User ID from JWT: {user_id}")
 
         # Obtener parámetros de paginación
         page = request.args.get('page', 1, type=int)
