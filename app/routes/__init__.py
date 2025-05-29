@@ -3,6 +3,7 @@ from .survey_routes import survey_bp
 from .user_routes import user_bp
 from .factor_routes import factor_bp
 from .survey_type_routes import survey_type_bp
+from .farm_routes import farm_bp
 
 # Lista de blueprints para registrar
 __all__ = [
@@ -10,15 +11,17 @@ __all__ = [
     'survey_bp',
     'user_bp',
     'factor_bp',
-    'survey_type_bp'
+    'survey_type_bp',
+    'farm_bp'
 ]
 
 # Función para registrar todos los blueprints en la aplicación
 def register_routes(app):
 
     # Registro de Blueprints
-    app.register_blueprint(auth_bp)
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(survey_bp)
-    app.register_blueprint(user_bp)
-    app.register_blueprint(factor_bp)
+    app.register_blueprint(user_bp, url_prefix='/api/users')
+    app.register_blueprint(factor_bp, url_prefix='/api/factors')
     app.register_blueprint(survey_type_bp)
+    app.register_blueprint(farm_bp)
