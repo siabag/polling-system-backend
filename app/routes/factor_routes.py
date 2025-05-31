@@ -233,3 +233,53 @@ def delete_factor(id):
             "error": True,
             "message": f"Error al eliminar el factor: {str(e)}"
         }), 500
+    
+# Endpoint para obtener el detalle de un factor
+@factor_bp.route('/api/factors/<int:id>', methods=['GET'])
+def get_factor(id):
+    try:
+        # Buscar el factor por ID
+        factor = Factor.query.get(id)
+
+        if not factor:
+            return jsonify({
+                "error": True,
+                "message": "Factor no encontrado"
+            }), 404
+
+        # Formatear los datos del factor y sus valores posibles
+        factor_data = {
+            "id": factor.id,
+            "nombre": factor.nombre,
+            "descripcion": factor.descripcion,
+            "categoria": factor.categoria,
+            "activo": factor.activo,
+            "tipo_encuesta_id": factor.tipo_encuesta_id,
+            "created_at": factor.created_at.isoformat(),
+            "updated_at": factor.updated_at.isoformat() if factor.updated_at else None,
+            "valores_posibles": [
+                {
+                    "id": value.id,
+                    "factor_id": value.factor_id,
+                    "valor": value.valor,
+                    "codigo": value.codigo,
+                    "descripcion": value.descripcion,
+                    "activo": value.activo,
+                    "created_at": value.created_at.isoformat(),
+                    "updated_at": value.updated_at.isoformat() if value.updated_at else None
+                }
+                for value in factor.valores_posibles
+            ]
+        }
+
+        return jsonify({
+            "success": True,
+            "data": factor_data,
+            "message": "Factor obtenido exitosamente"
+        }), 200
+
+    except SQLAlchemyError as e:
+        return jsonify({
+            "error": True,
+            "message": f"Error al obtener el factor: {str(e)}"
+        }), 500

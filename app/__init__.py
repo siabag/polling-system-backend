@@ -23,6 +23,12 @@ def create_app():
     with app.app_context():
         db.create_all()
     
-    CORS(app)
+    CORS(app, resources={
+        r"/*":{
+            "origins":["http://localhost:3000"],
+            "methods":["GET","POST","PUT","DELETE","OPTIONS"],
+            "allow_headers":["Content-Type", "Authorization"]
+        }
+    })
 
     return app
