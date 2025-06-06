@@ -129,3 +129,54 @@ def delete_user(user_id):
             "error": True,
             "message": f"Error al eliminar el usuario: {str(e)}"
         }), 500
+    
+from werkzeug.security import generate_password_hash
+
+# Endpoint para crear un nuevo usuario
+@user_bp.route('/users', methods=['POST'])
+def create_user():
+    try:
+        data = request.get_json()
+
+        # Validar que se proporcionen los datos necesarios
+        required_fields = ['nombre', 'apellido', 'correo', 'contrasena', 'rol_id']
+        if not all(field in data for field in required_fields):
+            return jsonify({
+                "error": True,
+                "message": "Faltan datos requeridos"
+            }), 400
+
+        if User.query.filter_by(correo=data['correo']).first():
+            return jsonify({
+                "error": True,
+                "message": "El correo ya está registrado"
+            }), 400
+
+        # Crear un nuevo usuario
+        hashed_password = generate_password_hash(data['contrasena'], method='sha256')
+        new_user = User(
+            nombre=data['nombre'],
+            apellido=data['apellido'],
+            correo=data['correo'],
+            contrasena_hash=hashed_password,
+            rol_id=data['rol_id'],
+            activo=data.get('activo', True)  # Por defecto, el usuario está activo
+        )
+
+        # Guardar el usuario en la base de datos
+        db.session.add(new_user)
+        db.session.commit()
+
+        # Devolver la respuesta con los detalles del usuario creado
+        return jsonify({
+            "success": True,
+            "data": new_user.to_dict(),
+            "message": "Usuario creado exitosamente"
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": True,
+            "message": f"Error al crear el usuario: {str(e)}"
+        }), 500
