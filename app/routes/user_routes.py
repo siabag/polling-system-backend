@@ -132,10 +132,23 @@ def delete_user(user_id):
     
 from werkzeug.security import generate_password_hash
 
-# Endpoint para crear un nuevo usuario
+# Endpoint para crear un nuevo usuario (solo accesible para administradores)
 @user_bp.route('/users', methods=['POST'])
+@jwt_required()
 def create_user():
     try:
+        # Obtener el ID del usuario autenticado
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+
+        # Verificar si el usuario tiene permisos de administrador
+        if not current_user or current_user.rol.nombre != 'administrador':
+            return jsonify({
+                "error": True,
+                "message": "Acceso denegado. Solo los administradores pueden crear usuarios."
+            }), 403
+
+        # Obtener los datos del cuerpo de la solicitud
         data = request.get_json()
 
         # Validar que se proporcionen los datos necesarios
@@ -146,6 +159,7 @@ def create_user():
                 "message": "Faltan datos requeridos"
             }), 400
 
+        # Verificar si el correo ya está registrado
         if User.query.filter_by(correo=data['correo']).first():
             return jsonify({
                 "error": True,
@@ -175,6 +189,7 @@ def create_user():
         }), 201
 
     except Exception as e:
+        # Manejar errores inesperados
         db.session.rollback()
         return jsonify({
             "error": True,
