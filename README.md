@@ -11,6 +11,9 @@ Git (opcional): Si deseas clonar el repositorio, necesitarás Git instalado.
 Variables de Entorno : El proyecto utiliza un archivo .env para manejar las variables de entorno.
 Entorno Virtual : Se recomienda usar un entorno virtual para evitar conflictos entre dependencias. Puedes crearlo con: 
 ----           python -m venv venv             ---------
+activar el entorno virtual:
+---- desde bash: source venv/Scripts/activate
+---- desde powershell: venv/Scripts/activate
 
 Instala las dependencias listadas en el archivo requirements.txt:
 ----           pip install -r requirements.txt        ------------

@@ -16,39 +16,75 @@ from app.models.survey_type_model import SurveyType
 survey_bp = Blueprint('survey', __name__)
 
 def get_encuesta_with_details(encuesta_id):
-
     encuesta = Survey.query.get(encuesta_id)
     if not encuesta:
         return None
 
     # Obtener datos relacionados
     tipo_encuesta = encuesta.tipo_encuesta
-    finca = Farm.query.get(encuesta.finca_id)
+    finca = encuesta.finca
 
     return {
         "id": encuesta.id,
         "fecha_aplicacion": encuesta.fecha_aplicacion.isoformat(),
+        "tipo_encuesta_id": encuesta.tipo_encuesta_id,
+        "usuario_id": encuesta.usuario_id,
+        "finca_id": encuesta.finca_id,
+        "observaciones": encuesta.observaciones,
+        "completada": encuesta.completada,
+        "created_at": encuesta.created_at.isoformat(),
+        "updated_at": encuesta.updated_at.isoformat() if encuesta.updated_at else None,
         "tipo_encuesta": {
             "id": tipo_encuesta.id,
-            "nombre": tipo_encuesta.nombre
+            "nombre": tipo_encuesta.nombre,
+            "descripcion": tipo_encuesta.descripcion,
+            "activo": tipo_encuesta.activo,
+            "created_at": tipo_encuesta.created_at.isoformat(),
+            "updated_at": tipo_encuesta.updated_at.isoformat() if tipo_encuesta.updated_at else None
         } if tipo_encuesta else None,
         "finca": {
             "id": finca.id,
-            "nombre": finca.nombre
+            "nombre": finca.nombre,
+            "ubicacion": finca.ubicacion,
+            "latitud": str(finca.latitud) if finca.latitud else None,
+            "longitud": str(finca.longitud) if finca.longitud else None,
+            "propietario": finca.propietario,
+            "usuario_id": finca.usuario_id,
+            "created_at": finca.created_at.isoformat(),
+            "updated_at": finca.updated_at.isoformat() if finca.updated_at else None
         } if finca else None,
-        "observaciones": encuesta.observaciones,
-        "completada": encuesta.completada,
         "respuestas": [
             {
                 "id": respuesta.id,
+                "encuesta_id": respuesta.encuesta_id,
                 "factor_id": respuesta.factor_id,
                 "valor_posible_id": respuesta.valor_posible_id,
-                "respuesta_texto": respuesta.respuesta_texto
+                "respuesta_texto": respuesta.respuesta_texto,
+                "created_at": respuesta.created_at.isoformat(),
+                "updated_at": respuesta.updated_at.isoformat() if respuesta.updated_at else None,
+                "factor": {
+                    "id": respuesta.factor.id,
+                    "nombre": respuesta.factor.nombre,
+                    "descripcion": respuesta.factor.descripcion,
+                    "categoria": respuesta.factor.categoria,
+                    "activo": respuesta.factor.activo,
+                    "tipo_encuesta_id": respuesta.factor.tipo_encuesta_id,
+                    "created_at": respuesta.factor.created_at.isoformat(),
+                    "updated_at": respuesta.factor.updated_at.isoformat() if respuesta.factor.updated_at else None
+                },
+                "valor_posible": {
+                    "id": respuesta.valor_posible.id,
+                    "factor_id": respuesta.valor_posible.factor_id,
+                    "valor": respuesta.valor_posible.valor,
+                    "codigo": respuesta.valor_posible.codigo,
+                    "descripcion": respuesta.valor_posible.descripcion,
+                    "activo": respuesta.valor_posible.activo,
+                    "created_at": respuesta.valor_posible.created_at.isoformat(),
+                    "updated_at": respuesta.valor_posible.updated_at.isoformat() if respuesta.valor_posible.updated_at else None
+                }
             }
             for respuesta in encuesta.respuestas
-        ],
-        "created_at": encuesta.created_at.isoformat(),
-        "updated_at": encuesta.updated_at.isoformat() if encuesta.updated_at else None
+        ]
     }
 
 # Endpoint para crear una nueva encuesta
@@ -174,14 +210,55 @@ def create_encuesta():
 def list_encuestas():
     try:
         user_id = get_jwt_identity()
-        print(f"User ID from JWT: {user_id}")
 
-        # Obtener parámetros de paginación
+        # Obtener parámetros de paginación y filtros
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('limit', 10, type=int)
+        tipo_encuesta_id = request.args.get('tipo_encuesta_id', None, type=int)
+        finca_id = request.args.get('finca_id', None,type=int)
+        fecha_desde = request.args.get('fecha_desde', None)
+        fecha_hasta = request.args.get('fecha_hasta', None)
+        completada = request.args.get('completada', type=lambda v: v.lower() == 'true')
 
+        # Construir query base
         query = Survey.query.filter_by(usuario_id=user_id)
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        # Aplicar filtros
+        if tipo_encuesta_id is not None:
+            query = query.filter_by(tipo_encuesta_id=tipo_encuesta_id)
+        
+        if finca_id is not None:
+            query = query.filter_by(finca_id=finca_id)
+        
+        if fecha_desde:
+            try:
+                fecha_desde_dt = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+                query = query.filter(Survey.fecha_aplicacion >= fecha_desde_dt)
+            except ValueError:
+                return jsonify({
+                    "error": True,
+                    "message": "Formato de fecha desde inválido. Use YYYY-MM-DD"
+                }), 400
+        
+        if fecha_hasta:
+            try:
+                fecha_hasta_dt = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+                query = query.filter(Survey.fecha_aplicacion <= fecha_hasta_dt)
+            except ValueError:
+                return jsonify({
+                    "error": True,
+                    "message": "Formato de fecha hasta inválido. Use YYYY-MM-DD"
+                }), 400
+        
+        if completada is not None:
+            query = query.filter_by(completada=completada)
+
+        # Paginar resultados
+        pagination = query.order_by(Survey.fecha_aplicacion.desc()).paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
 
         return jsonify({
             "success": True,

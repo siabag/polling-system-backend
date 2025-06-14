@@ -4,6 +4,7 @@ from .user_routes import user_bp
 from .factor_routes import factor_bp
 from .survey_type_routes import survey_type_bp
 from .farm_routes import farm_bp
+from .reports_routes import reports_bp
 
 # Lista de blueprints para registrar
 __all__ = [
@@ -25,3 +26,4 @@ def register_routes(app):
     app.register_blueprint(factor_bp)
     app.register_blueprint(survey_type_bp)
     app.register_blueprint(farm_bp)
+    app.register_blueprint(reports_bp)
