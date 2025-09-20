@@ -75,6 +75,24 @@ def register():
             "message": f"Error al registrar el usuario: {str(e)}"
         }), 500
 
+# Endpoint para listar todos los roles
+@auth_bp.route('/roles', methods=['GET'])
+def list_roles():
+    try:
+        roles = Role.query.all()
+        roles_list = [{"id": role.id, "nombre": role.nombre} for role in roles]
+
+        return jsonify({
+            "success": True,
+            "data": roles_list,
+            "message": "Roles obtenidos exitosamente"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Error al obtener los roles: {str(e)}"
+        }), 500
 
 # Endpoint para iniciar sesión
 @auth_bp.route('/login', methods=['POST'])
