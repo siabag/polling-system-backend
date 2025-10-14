@@ -217,3 +217,57 @@ def delete_data_tth(data_tth_id):
             "error": True,
             "message": f"Error al eliminar el registro de DataTTH: {str(e)}"
         }), 500
+
+
+# Endpoint: Obtener registros de DataTTH en un rango de fechas
+@data_tth_bp.route('/api/data_tth/range', methods=['GET'])
+@jwt_required()
+def get_data_tth_by_date_range():
+    try:
+        # Obtener parámetros de consulta
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('limit', 10, type=int)
+
+        # Validar que se proporcionen las fechas requeridas
+        if not start_date or not end_date:
+            return jsonify({
+                "error": True,
+                "message": "Faltan las fechas de inicio o fin"
+            }), 400
+
+        # Convertir las fechas a objetos datetime
+        try:
+            start_datetime = datetime.fromisoformat(start_date)
+            end_datetime = datetime.fromisoformat(end_date)
+        except ValueError:
+            return jsonify({
+                "error": True,
+                "message": "Formato de fecha inválido"
+            }), 400
+
+        # Consultar registros dentro del rango de fechas
+        query = DataTTH.query.filter(
+            DataTTH.received_at.between(start_datetime, end_datetime)
+        )
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        result = [
+            data_tth.to_dict() for data_tth in pagination.items
+        ]
+
+        return jsonify({
+            "success": True,
+            "data": result,
+            "total": pagination.total,
+            "page": page,
+            "totalPages": pagination.pages,
+            "message": "Registros de DataTTH obtenidos exitosamente en el rango de fechas"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Error al obtener los registros de DataTTH: {str(e)}"
+        }), 500
