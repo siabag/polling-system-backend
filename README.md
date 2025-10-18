@@ -1,30 +1,79 @@
-Sistema de Encuestas Quincenales
-Este es el backend de un sistema diseñado para gestionar encuestas quincenales relacionadas con cultivos de café. El sistema permite a los usuarios registrar fincas, crear encuestas, responder factores y generar reportes. Está desarrollado en Flask y utiliza una base de datos MySQL .
+# 🌱 Sistema de Encuestas Quincenales (Backend)
 
-Requisitos
-Para ejecutar este backend, necesitarás lo siguiente:
+Backend de un sistema diseñado para gestionar encuestas quincenales relacionadas con cultivos de café.  
+El sistema permite a los usuarios registrar fincas, crear encuestas, responder factores y generar reportes.  
+Desarrollado en **Flask** y utiliza una base de datos **MySQL**.
 
-Python 3.8 o superior : Asegúrate de tener Python instalado en tu sistema.
-MySQL Server : Necesitarás una instancia de MySQL configurada y en funcionamiento.
-Pip : Gestor de paquetes de Python. Viene incluido con Python
-Git (opcional): Si deseas clonar el repositorio, necesitarás Git instalado.
-Variables de Entorno : El proyecto utiliza un archivo .env para manejar las variables de entorno.
-Entorno Virtual : Se recomienda usar un entorno virtual para evitar conflictos entre dependencias. Puedes crearlo con: 
-----           python -m venv venv             ---------
-activar el entorno virtual:
----- desde bash: source venv/Scripts/activate
----- desde powershell: venv/Scripts/activate
+---
 
-Instala las dependencias listadas en el archivo requirements.txt:
-----           pip install -r requirements.txt        ------------
+## ✨ Características Principales
 
-Crea un archivo .env en la raíz del proyecto con las siguientes variables:
-----         SECRET_KEY=your_secret_key
-----         DATABASE_URL=mysql+pymysql://root:password@localhost:3306/encuestas_cafe_db
-----         JWT_SECRET_KEY=your_jwt_secret_key
-----         FLASK_ENV=development
+- **Gestión de Usuarios**: Registro, autenticación JWT y roles (Administrador, Encuestador, Analista)
+- **Registro de Fincas**: Asociadas a usuarios, con ubicación geográfica opcional
+- **Encuestas Dinámicas**: Soporte para varios tipos de encuesta (P1, P2, P3, P4)
+- **Factores Personalizables**: Agrupados por categorías y vinculados a tipos de encuesta
+- **Respuestas Estructuradas**: Uso de valores predefinidos o texto libre
+- **Base de Datos Relacional**: Modelo bien estructurado con relaciones e índices
+- **Datos Iniciales**: Usuarios, roles y tipos de encuesta precargados
 
-Ejecuta el siguiente script SQL para crear la base de datos y las tablas:
+---
+
+## 🛠️ Tecnologías Utilizadas
+
+| Capa          | Tecnología                  |
+|---------------|-----------------------------|
+| Backend       | Flask, Python 3.8+          |
+| Base de Datos | MySQL                       |
+| ORM           | SQLAlchemy                  |
+| Seguridad     | JWT, PBKDF2-SHA256          |
+| Entorno       | `.env`, entorno virtual     |
+
+---
+
+## 🚀 Instalación y Configuración
+
+### Prerrequisitos
+
+- [Python 3.8+](https://www.python.org/downloads/) 
+- [MySQL Server](https://dev.mysql.com/downloads/mysql/) 
+- `pip` (viene con Python)
+- Git (opcional)
+
+---
+
+### 1. Clonar el repositorio (si aplica)
+
+```bash
+git clone https://github.com/siabag/polling-system-backend
+cd polling-system-backend
+```
+
+### 2. Crear y activar el entorno virtual
+
+```bash
+python -m venv venv
+```
+
+### 3. Instalar dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configurar variables de entorno
+Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
+
+```bash
+SECRET_KEY=your_secret_key
+DATABASE_URL=mysql+pymysql://root:password@localhost:3306/encuestas_cafe_db
+JWT_SECRET_KEY=your_jwt_secret_key
+FLASK_ENV=development
+```
+
+### 5. Ejecutar script SQL
+Ejecuta este script en tu servidor MySQL para crear la base de datos, tablas e insertar datos iniciales:
+
+```bash
 -- Script de creación de base de datos para Sistema de Encuestas Quincenales
 CREATE DATABASE encuestas_cafe_db;
 USE encuestas_cafe_db;
@@ -164,6 +213,4 @@ INSERT INTO tipo_encuesta (nombre, descripcion) VALUES
 -- La contraseña es 'admin123' hasheada usando el formato PBKDF2
 INSERT INTO usuario (nombre, apellido, correo, contrasena_hash, rol_id) VALUES 
 ('Admin', 'Sistema', 'admin@sistema.com', 'pbkdf2:sha256:600000$eHRObfez$ef1d0a39267a884807b217a7a2899c5691a82cf92e787fd7a82008ed64a48960', 1);
-
---------------------------------------------------------------------------------------------------------
-
+```
