@@ -2,7 +2,12 @@
 
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    get_jwt_identity,
+    jwt_required
+)
 from app.models.user_model import User
 from app.extensions import db
 from app.models.role_model import Role
@@ -99,8 +104,6 @@ def list_roles():
 def login():
     try:
         data = request.get_json()
-
-        # Validar que se proporcionen correo y contraseña
         correo = data.get('correo')
         contrasena = data.get('contrasena')
         if not correo or not contrasena:
@@ -109,7 +112,6 @@ def login():
                 "message": "Correo y contraseña son requeridos"
             }), 400
 
-        # Buscar al usuario por correo
         user = User.query.filter_by(correo=correo).first()
         if not user or not check_password_hash(user.contrasena_hash, contrasena):
             return jsonify({
@@ -117,14 +119,15 @@ def login():
                 "message": "Credenciales inválidas"
             }), 401
 
-        # Generar un token JWT
+        # Crear Access Token y Refresh Token
         access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
 
-        # Devolver el token y la información del usuario
         return jsonify({
             "success": True,
             "data": {
                 "access_token": access_token,
+                "refresh_token": refresh_token,
                 "user": {
                     "id": user.id,
                     "nombre": user.nombre,
@@ -142,7 +145,6 @@ def login():
             "message": f"Error al iniciar sesión: {str(e)}"
         }), 500
 
-
 # Endpoint para cerrar sesión
 @auth_bp.route('/logout', methods=['POST'])
 @jwt_required()
@@ -158,7 +160,6 @@ def logout():
             "error": True,
             "message": f"Error al cerrar sesión: {str(e)}"
         }), 500
-
 
 # Endpoint para obtener información del usuario actual (protegido con JWT)
 @auth_bp.route('/me', methods=['GET'])
@@ -191,4 +192,34 @@ def me():
         return jsonify({
             "error": True,
             "message": f"Error al obtener la información del usuario: {str(e)}"
+        }), 500
+    
+# endpoint para refrescar el Access Token
+@auth_bp.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user:
+            return jsonify({
+                "error": True,
+                "message": "Usuario no encontrado"
+            }), 404
+
+        # Generar un nuevo Access Token
+        new_access_token = create_access_token(identity=current_user_id)
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "access_token": new_access_token
+            },
+            "message": "Token de acceso renovado exitosamente"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Error al refrescar el token: {str(e)}"
         }), 500
