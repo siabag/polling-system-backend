@@ -25,3 +25,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+#archivos de entrenamiento
+yolo_best.pth
+sam_vit_b_01ec64.pth
+resnet18_best.pt

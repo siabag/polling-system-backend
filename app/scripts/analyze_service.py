@@ -1,5 +1,4 @@
-# scripts/analyze_service.py
-
+# app/scripts/analyze_service.py
 """
 Servicio de análisis optimizado - Extrae lógica del script original
 Procesa 1 imagen a la vez con máximo rendimiento
@@ -85,9 +84,8 @@ class AnalysisService:
     
     def _load_sam(self):
         """Carga SAM como el original"""
-        from config.config import config as cfg
-        
-        sam_mode = cfg.SAM_MODE
+        # CAMBIO IMPORTANTE: Eliminar la importación problemática
+        sam_mode = self.config.get('SAM_MODE', 'off')
         if sam_mode == 'off':
             self.sam = None
             self.mask_generator = None
