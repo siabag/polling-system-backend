@@ -43,17 +43,18 @@ def get_data_tth_by_date():
                 "message": "No se encontraron registros en el rango de fechas especificado"
             }), 200
 
-        # Crear estructura agrupada para las 4 métricas
+        # Crear estructura agrupada para las 5 métricas
         grouped_data = {
             "temperatura_ambiente": [],
             "humedad_ambiente": [],
             "temperatura_suelo": [],
-            "humedad_suelo": []
+            "humedad_suelo": [],
+            "conductividad_suelo": []
         }
 
         for r in records:
             # Omitir registros sin datos válidos
-            if not any([r.TempC_SHT, r.Hum_SHT, r.temp_SOIL, r.water_SOIL]):
+            if not any([r.TempC_SHT, r.Hum_SHT, r.temp_SOIL, r.water_SOIL, r.conduct_SOIL]):
                 continue
 
             if r.TempC_SHT is not None:
@@ -75,6 +76,11 @@ def get_data_tth_by_date():
                 grouped_data["humedad_suelo"].append({
                     "fecha_hora": r.received_at,
                     "valor": r.water_SOIL
+                })
+            if r.conduct_SOIL is not None:
+                grouped_data["conductividad_suelo"].append({
+                    "fecha_hora": r.received_at,
+                    "valor": r.conduct_SOIL
                 })
 
         return jsonify({
@@ -132,14 +138,15 @@ def download_data_tth_csv():
         output = io.StringIO()
         writer = csv.writer(output)
 
-        # Encabezados: solo campos relevantes + contexto
+        # Encabezados: incluir conductividad del suelo
         writer.writerow([
             "received_at",
             "device_id",
             "TempC_SHT",
             "Hum_SHT",
             "temp_SOIL",
-            "water_SOIL"
+            "water_SOIL",
+            "conduct_SOIL"
         ])
 
         # Escribir filas
@@ -150,7 +157,8 @@ def download_data_tth_csv():
                 r.TempC_SHT if r.TempC_SHT is not None else '',
                 r.Hum_SHT if r.Hum_SHT is not None else '',
                 r.temp_SOIL if r.temp_SOIL is not None else '',
-                r.water_SOIL if r.water_SOIL is not None else ''
+                r.water_SOIL if r.water_SOIL is not None else '',
+                r.conduct_SOIL if r.conduct_SOIL is not None else ''
             ])
 
         output.seek(0)
