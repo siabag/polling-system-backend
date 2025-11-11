@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required
 from app.models.data_tth_model import DataTTH
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from collections import defaultdict
 import csv
 import io
 
@@ -181,4 +182,186 @@ def download_data_tth_csv():
         return jsonify({
             "error": True,
             "message": f"Error al generar el archivo CSV: {str(e)}"
+        }), 500
+    
+@data_tth_bp.route('/api/data_tth/monthly_summary', methods=['GET'])
+@jwt_required()
+def get_monthly_summary():
+    try:
+        # Obtener parámetros de fecha
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+
+        # Consultar la fecha más antigua en la base de datos
+        oldest_record = DataTTH.query.order_by(DataTTH.received_at.asc()).first()
+        if not oldest_record:
+            return jsonify({
+                "success": True,
+                "data": {
+                    "notas": {},
+                    "summary": []
+                },
+                "message": "No hay datos disponibles en la base de datos"
+            }), 200
+
+        # Fecha más antigua (default para start_date)
+        oldest_date = datetime.strptime(oldest_record.received_at.split()[0], "%Y-%m-%d").date()
+
+        # Último día del mes anterior (default para end_date)
+        today = date.today()
+        first_day_of_current_month = today.replace(day=1)
+        last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
+
+        # Asignar valores por defecto si no se proporcionan fechas
+        if not start_date_str:
+            start_date = oldest_date
+        else:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+
+        if not end_date_str:
+            end_date = last_day_of_previous_month
+        else:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+
+        # Convertir a cadenas
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+
+        # Consultar registros filtrando por rango de fechas
+        query = DataTTH.query.filter(
+            DataTTH.received_at.between(start_date_str, end_date_str)
+        )
+
+        records = query.all()
+
+        if not records:
+            return jsonify({
+                "success": True,
+                "data": {
+                    "notas": {},
+                    "summary": []
+                },
+                "message": "No se encontraron registros en el rango de fechas especificado"
+            }), 200
+
+        # Agrupar por mes
+        monthly_data = defaultdict(lambda: {
+            "temperatura": [],
+            "humedad": [],
+            "year": None,
+            "month": None
+        })
+
+        for r in records:
+            # Extraer fecha del campo received_at (formato YYYY-MM-DD HH:MM:SS)
+            try:
+                dt = datetime.strptime(r.received_at.split()[0], "%Y-%m-%d")
+                year = dt.year
+                month = dt.month
+                month_key = f"{dt.strftime('%B')} de {year}"
+                year_month = f"{year}-{month:02d}" 
+            except Exception:
+                continue  # Omitir registros con fechas inválidas
+
+            if r.TempC_SHT is not None:
+                monthly_data[month_key]["temperatura"].append(r.TempC_SHT)
+            if r.Hum_SHT is not None:
+                monthly_data[month_key]["humedad"].append(r.Hum_SHT)
+
+            # Guardar year y month para ordenar
+            monthly_data[month_key]["year"] = year
+            monthly_data[month_key]["month"] = month
+
+        # Calcular estadísticas y preparar summary
+        summary = []
+        for month_key, data in monthly_data.items():
+            temp_vals = data["temperatura"]
+            hum_vals = data["humedad"]
+
+            if len(temp_vals) == 0 and len(hum_vals) == 0:
+                continue
+
+            # Calcular estadísticas
+            temp_avg = sum(temp_vals) / len(temp_vals) if temp_vals else 0
+            temp_max = max(temp_vals) if temp_vals else 0
+            temp_min = min(temp_vals) if temp_vals else 0
+
+            hum_avg = sum(hum_vals) / len(hum_vals) if hum_vals else 0
+            hum_max = max(hum_vals) if hum_vals else 0
+            hum_min = min(hum_vals) if hum_vals else 0
+
+            indice = (temp_avg + hum_avg) / 2
+
+            summary.append({
+                "mes": month_key,
+                "temperatura_promedio": round(temp_avg, 2),
+                "temperatura_max": round(temp_max, 2),
+                "temperatura_min": round(temp_min, 2),
+                "humedad_promedio": round(hum_avg, 2),
+                "humedad_max": round(hum_max, 2),
+                "humedad_min": round(hum_min, 2),
+                "n": len(temp_vals) + len(hum_vals),  # Total de registros válidos
+                "indice": round(indice, 2),
+                "year": data["year"],   
+                "month": data["month"]  
+            })
+
+        # Ordenar por año y mes
+        summary.sort(key=lambda x: (x["year"], x["month"]))
+
+        # Generar notas
+        if summary:
+            mes_mas_caluroso = max(summary, key=lambda x: x["temperatura_promedio"])
+            mes_mas_humedo = max(summary, key=lambda x: x["humedad_promedio"])
+            mes_menos_propicio = min(summary, key=lambda x: x["indice"])
+
+            notas = {
+                "mes_mas_caluroso": {
+                    "mes": mes_mas_caluroso["mes"],
+                    "valor": mes_mas_caluroso["temperatura_promedio"],
+                    "unidad": "°C"
+                },
+                "mes_mas_humedo": {
+                    "mes": mes_mas_humedo["mes"],
+                    "valor": mes_mas_humedo["humedad_promedio"],
+                    "unidad": "%"
+                },
+                "mes_menos_propicio": {
+                    "mes": mes_menos_propicio["mes"],
+                    "valor": mes_menos_propicio["indice"],
+                    "unidad": ""
+                }
+            }
+        else:
+            notas = {}
+
+        # Construir respuesta con notas al comienzo
+        response_data = {
+            "notas": notas,
+            "summary": [
+                {
+                    "mes": item["mes"],
+                    "temperatura_promedio": item["temperatura_promedio"],
+                    "temperatura_max": item["temperatura_max"],
+                    "temperatura_min": item["temperatura_min"],
+                    "humedad_promedio": item["humedad_promedio"],
+                    "humedad_max": item["humedad_max"],
+                    "humedad_min": item["humedad_min"],
+                    "n": item["n"],
+                    "indice": item["indice"]
+                }
+                for item in summary
+            ]
+        }
+
+        return jsonify({
+            "success": True,
+            "data": response_data,
+            "message": "Resumen mensual generado exitosamente"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Error al generar el resumen mensual: {str(e)}"
         }), 500
