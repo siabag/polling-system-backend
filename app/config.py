@@ -1,5 +1,7 @@
+# config.py
 from dotenv import load_dotenv
 import os
+from datetime import timedelta
 
 load_dotenv()
 
@@ -11,3 +13,7 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "jwt_default_secret_key")
+
+    # Duración de los tokens JWT
+    WT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)    # Access token: 1 hora
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=1)  # Refresh token:  1 día
