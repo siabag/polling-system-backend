@@ -5,6 +5,7 @@ from datetime import datetime, date, timedelta
 from collections import defaultdict
 import csv
 import io
+import traceback
 
 data_tth_bp = Blueprint('data_tth', __name__)
 
@@ -205,7 +206,8 @@ def get_monthly_summary():
             }), 200
 
         # Fecha más antigua (default para start_date)
-        oldest_date = datetime.strptime(oldest_record.received_at.split()[0], "%Y-%m-%d").date()
+        # Parsear formato ISO 8601: YYYY-MM-DDTHH:MM:SS.fZ
+        oldest_date = datetime.fromisoformat(oldest_record.received_at.replace('Z', '+00:00')).date()
 
         # Último día del mes anterior (default para end_date)
         today = date.today()
@@ -253,13 +255,12 @@ def get_monthly_summary():
         })
 
         for r in records:
-            # Extraer fecha del campo received_at (formato YYYY-MM-DD HH:MM:SS)
+            # Extraer fecha del campo received_at (formato ISO 8601)
             try:
-                dt = datetime.strptime(r.received_at.split()[0], "%Y-%m-%d")
+                dt = datetime.fromisoformat(r.received_at.replace('Z', '+00:00'))
                 year = dt.year
                 month = dt.month
                 month_key = f"{dt.strftime('%B')} de {year}"
-                year_month = f"{year}-{month:02d}" 
             except Exception:
                 continue  # Omitir registros con fechas inválidas
 
@@ -300,7 +301,7 @@ def get_monthly_summary():
                 "humedad_promedio": round(hum_avg, 2),
                 "humedad_max": round(hum_max, 2),
                 "humedad_min": round(hum_min, 2),
-                "n": len(temp_vals) + len(hum_vals),  # Total de registros válidos
+                "n": len(temp_vals) + len(hum_vals),
                 "indice": round(indice, 2),
                 "year": data["year"],   
                 "month": data["month"]  
@@ -361,6 +362,7 @@ def get_monthly_summary():
         }), 200
 
     except Exception as e:
+        print(traceback.format_exc())
         return jsonify({
             "error": True,
             "message": f"Error al generar el resumen mensual: {str(e)}"
