@@ -260,7 +260,22 @@ def get_monthly_summary():
                 dt = datetime.fromisoformat(r.received_at.replace('Z', '+00:00'))
                 year = dt.year
                 month = dt.month
-                month_key = f"{dt.strftime('%B')} de {year}"
+                month_name = dt.strftime("%B")
+                month_name_es = {
+                    "January": "Enero",
+                    "February": "Febrero",
+                    "March": "Marzo",
+                    "April": "Abril",
+                    "May": "Mayo",
+                    "June": "Junio",
+                    "July": "Julio",
+                    "August": "Agosto",
+                    "September": "Septiembre",
+                    "October": "Octubre",
+                    "November": "Noviembre",
+                    "December": "Diciembre"
+                }[month_name]
+                month_key = f"{month_name_es} de {year}"
             except Exception:
                 continue  # Omitir registros con fechas inválidas
 
